@@ -16,7 +16,7 @@
 #define VREF               3300.0        
 #define TEMPERATURE 25
 
-
+#define URL ""
 #define WIFI_SSID "Xtech789"
 #define WIFI_PASS "xtech789"
 
@@ -70,7 +70,7 @@ void mqtt_app_start(void) {
 
 
 void send_to_private_php(float tds_value) {
-    const char *url = "http://iot.thietkewebuytin.vn/update_tds.php";
+    const char *url = URL;
 
     esp_http_client_config_t config = {
         .url = url,
@@ -137,11 +137,7 @@ void tds_task(void *pvParameters) {
         send_to_private_php(tds);
 
         printf("Chat luong nuoc (TDS): %.2f ppm\n", tds);
-
-        if (tds > 500) { 
-            printf("CANH BAO: Nuoc o nhiem! (%.2f ppm)\n", tds);
-        }
-        
+            
         vTaskDelay(pdMS_TO_TICKS(2000));
     }
 }
