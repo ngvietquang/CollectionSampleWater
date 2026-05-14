@@ -67,21 +67,34 @@ void mqtt_app_start(void) {
     mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
     esp_mqtt_client_start(mqtt_client);
 }
-void write_thingspeak(float value) {
-    if (mqtt_client == NULL) return;
 
-    char topic[100];
-    char payload[50];
 
-    snprintf(topic, sizeof(topic), "channels/%s/publish", THINGSPEAK_CHANNEL_ID);
-    snprintf(payload, sizeof(payload), "field1=%.2f", value);
-    int msg_id = esp_mqtt_client_publish(mqtt_client, topic, payload, 0, 1, 0);
-    
-    if (msg_id != -1) {
-        printf("MQTT: Đã gửi thành công TDS: %.2f ppm (ID: %d)\n", value, msg_id);
+void send_to_private_php(float tds_value) {
+    const char *url = "http://iot.thietkewebuytin.vn/update_tds.php";
+
+    esp_http_client_config_t config = {
+        .url = url,
+        .method = HTTP_METHOD_POST,
+        .timeout_ms = 10000,
+    };
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+
+
+    char post_data[100];
+    snprintf(post_data, sizeof(post_data), "{\"tds\": %.2f, \"unit\": \"ppm\"}", tds_value);
+
+    esp_http_client_set_header(client, "Content-Type", "application/json");
+    esp_http_client_set_post_field(client, post_data, strlen(post_data));
+
+    esp_err_t err = esp_http_client_perform(client);
+    if (err == ESP_OK) {
+        printf("HTTP POST Status = %d\n", esp_http_client_get_status_code(client));
+        printf("Da gui\n");
     } else {
-        printf("MQTT: Gửi thất bại!\n");
+        printf("HTTP POST Failed: %s\n", esp_err_to_name(err));
     }
+
+    esp_http_client_cleanup(client);
 }
 float read_tds_logic(adc_oneshot_unit_handle_t handle) {
     int adc_raw;
@@ -121,7 +134,7 @@ void tds_task(void *pvParameters) {
     while(1) {
         float tds = read_tds_logic(adc1_handle);
         
-        write_thingspeak(tds);
+        send_to_private_php(tds);
 
         printf("Chat luong nuoc (TDS): %.2f ppm\n", tds);
 
@@ -142,6 +155,7 @@ void app_main() {
     ESP_ERROR_CHECK(ret);
     printf("Dang khoi tao Wi-Fi...\n");
     wifi_init();
-    mqtt_app_start();
+    printf("Cho Wi-Fi on dinh...\n");
+    vTaskDelay(pdMS_TO_TICKS(10000));
     xTaskCreate(tds_task, "Read_TDS", 4096, NULL, 1, NULL);
 }
